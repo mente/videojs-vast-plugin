@@ -24,6 +24,10 @@
         // used in the tests
         video.load = function() {};
         video.play = function() {};
+        video.canPlayType = function() {
+          return "probably";
+        };
+        video.buffered = 0;
 
         // see https://github.com/videojs/videojs-contrib-ads/blob/master/test/videojs.ads.test.js#L23
         window.setImmediate = function(callback) {
@@ -320,7 +324,7 @@
               callback(fake_response);
             });
         });
-        it("should do nothing with non-linear ads, and report the error", function() {
+          it("should do nothing with non-linear ads, and report the error", function() {
           spyOn(vast.util, "track");
           spyOn(player, "trigger");
           player.vast.getContent("some url");
@@ -333,6 +337,220 @@
 
     });
 
+    describe("findOptimalVPAIDTech", function() {
+      it("should return javascript media", function() {
+        var mediaFiles = [
+          {
+            fileURL: "TRL",
+            mimeType: "video/mp4",
+            width: 640,
+            height: 360
+          },
+          {
+            fileURL: "BuddhaForRill",
+            mimeType: "video/mp4",
+            width: 853,
+            height: 480
+          },
+          {
+            fileURL: "BuddhaForRill",
+            mimeType: "application/x-shockwave-flash",
+            width: 853,
+            height: 480,
+            apiFramework: "VPAID"
+          },
+          {
+            fileURL: "BuddhaForRill",
+            mimeType: "application/javascript",
+            width: 853,
+            height: 480,
+            apiFramework: "VPAID"
+          }
+        ];
+
+        expect(player.vast.findOptimalVPAIDTech(mediaFiles).mimeType).toEqual('application/javascript');
+      });
+
+
+      it("should return flash file as the only present VPAID type in media files", function() {
+        var mediaFiles = [
+          {
+            fileURL: "TRL",
+            mimeType: "video/mp4",
+            width: 640,
+            height: 360
+          },
+          {
+            fileURL: "BuddhaForRill",
+            mimeType: "application/x-shockwave-flash",
+            width: 853,
+            height: 480,
+            apiFramework: "VPAID"
+          },
+          {
+            fileURL: "BuddhaForRill",
+            mimeType: "video/mp4",
+            width: 853,
+            height: 480
+          }
+        ];
+
+        expect(player.vast.findOptimalVPAIDTech(mediaFiles).mimeType).toEqual('application/x-shockwave-flash');
+      });
+
+      it("should return null as VPAID tech is not found", function() {
+        var mediaFiles = [
+          {
+            fileURL: "TRL",
+            mimeType: "video/mp4",
+            width: 640,
+            height: 360
+          },
+          {
+            fileURL: "BuddhaForRill",
+            mimeType: "video/mp4",
+            width: 853,
+            height: 480
+          }
+        ];
+
+        expect(player.vast.findOptimalVPAIDTech(mediaFiles)).toBeNull();
+      });
+    });
+
   });
 
+  describe("VPAID", function() {
+    var vpaidTech = {
+      "apiFramework": "VPAID",
+      "bitrate": 0,
+      "codec": null,
+      "deliveryType": "progressive",
+      "fileURL": "http://cdn-static.liverail.com/js/LiveRail.AdManager-1.0.js?LR_PUBLISHER_ID=56889&LR_FORMAT=application/javascript&LR_AUTOPLAY=0&LR_CONTENT=1&LR_TITLE=Misunderstood+%C2%A3400%2C000+Banksy+destroyed+by+council&LR_VIDEO_ID=589129&LR_VERTICALS=international_news&LR_DEBUG=4",
+      "height": 480,
+      "maxBitrate": 0,
+      "mimeType": "application/javascript",
+      "minBitrate": 0,
+      "width": 640
+    };
+
+    function MockVPAIDAd() {
+      var self = this;
+
+      this.listeners = {};
+      this.handshakeVersion = function(version) {
+        return version;
+      };
+
+      this.initAd = function() {
+        this.trigger('AdLoaded');
+      };
+
+      this.subscribe = function(func, event) {
+        if (self.listeners[event] === undefined) {
+          self.listeners[event] = [];
+        }
+        self.listeners[event].push(func);
+      };
+
+      this.unsubscribe = function(func, event) {
+        if (self.listeners[event] === undefined) {
+          return;
+        }
+
+        var index = self.listeners[event].indexOf(func);
+        if (index >= 0) {
+          self.listeners[event].splice(index, 1);
+        }
+      };
+
+      this.trigger = function(event) {
+        if (self.listeners[event]) {
+          for (var i = 0; i < self.listeners[event].length; i++) {
+            self.listeners[event][i]();
+          }
+        }
+      };
+
+      return this;
+    }
+    beforeEach(function() {
+      spyOn(vast.client, "get").and.callFake(function(url, callback){
+        var response = {
+          "ads": [
+            {
+              "creatives": [
+                {
+                  "duration": 15,
+                  "mediaFiles": [vpaidTech],
+                  "skipDelay": null,
+                  "trackingEvents": {},
+                  "type": "linear",
+                  "videoClickThroughURLTemplate": null,
+                  "videoClickTrackingURLTemplates": []
+                },
+                {
+                  "type": "companion",
+                  "variations": [
+                    {
+                      "height": "250",
+                      "id": null,
+                      "staticResource": null,
+                      "trackingEvents": {},
+                      "type": null,
+                      "width": "300"
+                    },
+                    {
+                      "height": "60",
+                      "id": null,
+                      "staticResource": null,
+                      "trackingEvents": {},
+                      "type": null,
+                      "width": "300"
+                    },
+                    {
+                      "height": "90",
+                      "id": null,
+                      "staticResource": null,
+                      "trackingEvents": {},
+                      "type": null,
+                      "width": "728"
+                    }
+                  ],
+                  "videoClickTrackingURLTemplates": []
+                }
+              ],
+              "errorURLTemplates": [],
+              "impressionURLTemplates": [
+                null
+              ]
+            }
+          ],
+          "errorURLTemplates": []
+        };
+        callback(response);
+      });
+    });
+
+    it("should load VAST, parse vpaid and call adsready", function(done) {
+      var mockAd = new MockVPAIDAd();
+      var adsReadyCallback = jasmine.createSpy('adsReadyCallback').and.callFake(function() {
+        done();
+      });
+
+      spyOn(mockAd, 'handshakeVersion').and.callThrough();
+      spyOn(mockAd, 'initAd').and.callThrough();
+      spyOn(player.vast, 'loadVPAIDResource').and.callFake(function(mediaFile, callback) {
+        callback(mockAd);
+      });
+      player.one('adsready', adsReadyCallback);
+
+      player.vast.getContent("fake url", function() {});
+
+
+      expect(player.vast.loadVPAIDResource).toHaveBeenCalled();
+      expect(mockAd.handshakeVersion).toHaveBeenCalled();
+      expect(mockAd.initAd).toHaveBeenCalled();
+    });
+  });
 })(window, videojs, DMVAST);

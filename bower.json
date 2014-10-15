@@ -28,7 +28,7 @@
   ],
   "dependencies": {
     "videojs": "4.4.3",
-    "vast-client-js": "1.1.2",
+    "vast-client-js": "mente/vast-client-js#vpaid-production",
     "videojs-contrib-ads": "0.4.0"
   }
 }
