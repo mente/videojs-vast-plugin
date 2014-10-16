@@ -486,10 +486,9 @@
         player.vast.onVPAID('AdVideoComplete', function() {
           player.vastTracker.setProgress(vpaidObj.getAdDuration());
         });
-        player.vast.onVPAID('AdClickThru', function(e) {
+        player.vast.onVPAID('AdClickThru', function(url, id, playerHandles) {
           player.vastTracker.click();
-          if (e.data.playerHandles) {
-            var url = e.data.url;
+          if (playerHandles) {
             if (!url) {
               url = player.vast.getClickThrough();
             }
