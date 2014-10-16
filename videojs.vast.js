@@ -226,14 +226,18 @@
     };
 
     player.vast.prerollVPAID = function() {
-      player.el().querySelector('.vjs-tech').style.display = 'none';
+      if (vpaidPlayer) { //hide original player if separate video slot is used
+        player.el().querySelector('.vjs-tech').style.display = 'none';
+      }
       player.ads.startLinearAdMode();
       player.vast.showControls = player.controls();
       if (player.vast.showControls ) {
         player.controls(false);
       }
       player.vast.oneVPAID('AdStopped', function() {
-        player.el().querySelector('.vjs-tech').style.display = '';
+        if (vpaidPlayer) {
+          player.el().querySelector('.vjs-tech').style.display = '';
+        }
         player.vast.tearDown();
       });
       vpaidObj.startAd();
@@ -395,17 +399,24 @@
           throw new Error("Versions different to 2.0 are not supported");
         }
 
-        vpaidPlayer = document.createElement('video');
-        if (!vpaidPlayer.canPlayType) {
-          console.log('Video element is not supported, can not play vpaid ad');
-        }
+        var root = player.el(),
+          videoSlot;
+        if (/iphone|ipad|android/gi.test(navigator.userAgent)) { //in case if autoplay is disabled
+          console.log('using built-in video');
+          videoSlot = player.el().querySelector('.vjs-tech');
+        } else {
+          console.log('using second video tag');
+          vpaidPlayer = videoSlot = document.createElement('video');
+          if (!vpaidPlayer.canPlayType) {
+            console.log('Video element is not supported, can not play vpaid ad');
+          }
 
-        vpaidPlayer.className = 'vast-blocker';
-        var root = player.el();
-        root.insertBefore(vpaidPlayer, root.querySelector('.vjs-tech'));
+          vpaidPlayer.className = 'vast-blocker';
+          root.insertBefore(vpaidPlayer, root.querySelector('.vjs-tech'));
+        }
         var pref = {
-          videoSlot: vpaidPlayer,
-          videoSlotCanAutoPlay: !/ios/gi.test(window.navigator.userAgent),
+          videoSlot: videoSlot,
+          videoSlotCanAutoPlay: true,
           slot: root
         };
 
