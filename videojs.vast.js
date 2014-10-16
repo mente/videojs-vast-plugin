@@ -24,7 +24,7 @@
   vastPlugin = function(options) {
     var player = this;
     var settings = extend({}, defaults, options || {});
-    var vpaidObj, vpaidListeners = {}, vpaidIFrame = null;
+    var vpaidObj, vpaidListeners = {}, vpaidIFrame = null, vpaidPlayer = null;
 
     if (player.ads === undefined) {
         console.log("VAST requires videojs-contrib-ads");
@@ -64,6 +64,7 @@
 
                 if (creative.mediaFiles.length) {
 
+                  player.vastTracker = new vast.tracker(ad, creative);
                   var vpaidTech = player.vast.findOptimalVPAIDTech(creative.mediaFiles);
                   if (vpaidTech) {
                     foundVPAID = true;
@@ -76,11 +77,8 @@
                       player.trigger('adtimeout');
                       return;
                     }
-                  }
 
-                  player.vastTracker = new vast.tracker(ad, creative);
-
-                  var errorOccurred = false,
+                    var errorOccurred = false,
                       canplayFn = function() {
                         this.vastTracker.load();
                       },
@@ -103,22 +101,23 @@
                         player.trigger('ended');
                       };
 
-                  player.on('canplay', canplayFn);
-                  player.on('timeupdate', timeupdateFn);
-                  player.on('play', playFn);
-                  player.on('pause', pauseFn);
-                  player.on('error', errorFn);
+                    player.on('canplay', canplayFn);
+                    player.on('timeupdate', timeupdateFn);
+                    player.on('play', playFn);
+                    player.on('pause', pauseFn);
+                    player.on('error', errorFn);
 
-                  player.one('ended', function() {
-                    player.off('canplay', canplayFn);
-                    player.off('timeupdate', timeupdateFn);
-                    player.off('play', playFn);
-                    player.off('pause', pauseFn);
-                    player.off('error', errorFn);
-                    if (!errorOccurred) {
-                      this.vastTracker.complete();
-                    }
-                  });
+                    player.one('ended', function() {
+                      player.off('canplay', canplayFn);
+                      player.off('timeupdate', timeupdateFn);
+                      player.off('play', playFn);
+                      player.off('pause', pauseFn);
+                      player.off('error', errorFn);
+                      if (!errorOccurred) {
+                        this.vastTracker.complete();
+                      }
+                    });
+                  }
 
                   foundCreative = true;
                 }
@@ -177,6 +176,20 @@
       };
     };
 
+    player.vast.getClickThrough = function () {
+      var clickthrough;
+      if (player.vastTracker.clickThroughURLTemplate) {
+        clickthrough = vast.util.resolveURLTemplates(
+          [player.vastTracker.clickThroughURLTemplate],
+          {
+            CACHEBUSTER: Math.round(Math.random() * 1.0e+10),
+            CONTENTPLAYHEAD: player.vastTracker.progressFormated()
+          }
+        )[0];
+      }
+      return clickthrough;
+    };
+
     player.vast.preroll = function() {
       player.ads.startLinearAdMode();
       player.vast.showControls = player.controls();
@@ -188,16 +201,7 @@
       var adSources = player.vast.sources;
       player.src(adSources);
 
-      var clickthrough;
-      if (player.vastTracker.clickThroughURLTemplate) {
-        clickthrough = vast.util.resolveURLTemplates(
-          [player.vastTracker.clickThroughURLTemplate],
-          {
-            CACHEBUSTER: Math.round(Math.random() * 1.0e+10),
-            CONTENTPLAYHEAD: player.vastTracker.progressFormated()
-          }
-        )[0];
-      }
+      var clickthrough = player.vast.getClickThrough();
       var blocker = document.createElement("a");
       blocker.className = "vast-blocker";
       blocker.href = clickthrough || "#";
@@ -222,11 +226,19 @@
     };
 
     player.vast.prerollVPAID = function() {
+      player.el().querySelector('.vjs-tech').style.display = 'none';
       player.ads.startLinearAdMode();
+      player.vast.showControls = player.controls();
+      if (player.vast.showControls ) {
+        player.controls(false);
+      }
       player.vast.oneVPAID('AdStopped', function() {
+        player.el().querySelector('.vjs-tech').style.display = '';
         player.vast.tearDown();
       });
       vpaidObj.startAd();
+      //player might be playing if video tags are different
+      player.pause();
     };
 
     player.vast.tearDown = function() {
@@ -257,6 +269,9 @@
         vpaidObj = null;
         vpaidIFrame = null;
         vpaidListeners = {};
+        if (vpaidPlayer) {
+          vpaidPlayer.parentNode.removeChild(vpaidPlayer);
+        }
       }
     };
 
@@ -373,18 +388,25 @@
       document.body.appendChild(vpaidIFrame);
     };
 
-    player.vast.initVPAID = function (vpaidTech, cb) {
+    player.vast.initVPAID = function(vpaidTech, cb) {
       player.vast.loadVPAIDResource(vpaidTech, function(vpaid) {
         vpaidObj = vpaid;
         if (vpaid.handshakeVersion('2.0') != '2.0') {
           throw new Error("Versions different to 2.0 are not supported");
         }
 
-        var videoPlayer = player.el().querySelector('.vjs-tech');
+        vpaidPlayer = document.createElement('video');
+        if (!vpaidPlayer.canPlayType) {
+          console.log('Video element is not supported, can not play vpaid ad');
+        }
+
+        vpaidPlayer.className = 'vast-blocker';
+        var root = player.el();
+        root.insertBefore(vpaidPlayer, root.querySelector('.vjs-tech'));
         var pref = {
-          videoSlot: videoPlayer, //need video node itself
-          videoSlotCanAutoPlay: true,
-          slot: player.el()
+          videoSlot: vpaidPlayer,
+          videoSlotCanAutoPlay: !/ios/gi.test(window.navigator.userAgent),
+          slot: root
         };
 
         player.vast.onVPAID('AdError', function() {
