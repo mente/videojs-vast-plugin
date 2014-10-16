@@ -423,13 +423,82 @@
             vpaid.resizeAd(player.width, player.width, settings.viewMode);
           }
         });
-        //subscribe to trigger load complete event when vpaid ad is ready
-        if (cb) {
-          player.vast.oneVPAID('AdLoaded', function() {
-            cb(vpaid);
-          });
-        }
 
+        function setTrackerDuration() {
+          if (vpaidObj.getAdDuration) {
+            var duration = vpaidObj.getAdDuration();
+            if (duration > 0) {
+              player.vastTracker.setDuration(duration);
+            }
+          }
+        }
+        player.vast.oneVPAID('AdLoaded', function() {
+          if (cb) {
+            cb(vpaid);
+          }
+
+          setTrackerDuration();
+        });
+
+        player.vast.onVPAID('AdDurationChange', function() {
+          setTrackerDuration();
+        });
+        player.vast.onVPAID('AdSkipped', function() {
+          player.vastTracker.skip();
+          player.vast.tearDown();
+        });
+        player.vast.onVPAID('AdStarted', function() {
+          player.vastTracker.load();
+        });
+        player.vast.onVPAID('AdVolumeChange', function() {
+          player.vastTracker.setMuted(vpaidObj.getAdVolume() === 0);
+          player.setVolume(vpaidObj.getAdVolume());
+        });
+        player.vast.onVPAID('AdImpression', function() {
+          //TODO
+        });
+        player.vast.onVPAID('AdVideoStart', function() {
+          player.vastTracker.setProgress(0);
+        });
+        player.vast.onVPAID('AdVideoFirstQuartile', function() {
+          var emulatedFirstQuartile = Math.round(25 * vpaidObj.getAdDuration()) / 100;
+          player.vastTracker.setProgress(emulatedFirstQuartile);
+        });
+        player.vast.onVPAID('AdVideoMidpoint', function() {
+          var emulatedMidpoint = Math.round(50 * vpaidObj.getAdDuration()) / 100;
+          player.vastTracker.setProgress(emulatedMidpoint);
+        });
+        player.vast.onVPAID('AdVideoThirdQuartile', function() {
+          var emulatedThirdQuartile = Math.round(75 * vpaidObj.getAdDuration()) / 100;
+          player.vastTracker.setProgress(emulatedThirdQuartile);
+        });
+        player.vast.onVPAID('AdVideoComplete', function() {
+          player.vastTracker.setProgress(vpaidObj.getAdDuration());
+        });
+        player.vast.onVPAID('AdClickThru', function(e) {
+          player.vastTracker.click();
+          if (e.data.playerHandles) {
+            var url = e.data.url;
+            if (!url) {
+              url = player.vast.getClickThrough();
+            }
+
+            //TODO open url
+          }
+        });
+        player.vast.onVPAID('AdUserAcceptInvitation', function() {
+          //TODO implement in vast client
+          player.vastTracker.acceptInvitation();
+        });
+        player.vast.onVPAID('AdUserClose', function() {
+          player.vastTracker.close();
+        });
+        player.vast.onVPAID('AdPaused', function() {
+          player.vastTracker.pause(true);
+        });
+        player.vast.onVPAID('AdPlaying', function() {
+          player.vastTracker.pause(false);
+        });
         //TODO add creativeData
         vpaid.initAd(player.width(), player.height(), settings.viewMode, settings.bitrate, {}, pref);
       });
