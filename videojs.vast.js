@@ -338,42 +338,39 @@
       return foundTech;
     };
 
-    player.vast.createIFrame = function() {
-
-    };
-
     player.vast.loadVPAIDResource = function(mediaFile, callback) {
       if (mediaFile.mimeType != "application/javascript") {
         throw new Error("Loading not javascript vpaid ads is not supported");
       }
 
       vpaidIFrame = document.createElement('iframe');
-      document.body.appendChild(vpaidIFrame);
+      vpaidIFrame.style.display = 'none';
+      vpaidIFrame.onload = function() {
+        var iframeDoc = vpaidIFrame.contentDocument;
+        //Credos http://stackoverflow.com/a/950146/51966
+        // Adding the script tag to the head as suggested before
+        var head = iframeDoc.getElementsByTagName('head')[0];
+        var script = iframeDoc.createElement('script');
+        script.type = 'text/javascript';
+        script.src = mediaFile.fileURL;
 
-      var iframeDoc = vpaidIFrame.contentDocument;
-      //Credos http://stackoverflow.com/a/950146/51966
-      // Adding the script tag to the head as suggested before
-      var head = iframeDoc.getElementsByTagName('head')[0];
-      var script = iframeDoc.createElement('script');
-      script.type = 'text/javascript';
-      script.src = mediaFile.fileURL;
+        // Then bind the event to the callback function.
+        // There are several events for cross browser compatibility.
+        script.onreadystatechange = script.onload = function() {
+          if (!this.readyState || this.readyState === "loaded" || this.readyState === "complete") {
+            if (vpaidIFrame.contentWindow.getVPAIDAd === undefined) {
+              console.log("Unable to load script or script do not have getVPAIDAd method");
+              return;
+            }
 
-      // Then bind the event to the callback function.
-      // There are several events for cross browser compatibility.
-      script.onreadystatechange = script.onload = function() {
-        if (!this.readyState || this.readyState === "loaded" || this.readyState === "complete") {
-          if (vpaidIFrame.contentWindow.getVPAIDAd === undefined) {
-            throw new Error("Unable to load script or script do not have getVPAIDAd method");
+            callback(vpaidIFrame.contentWindow.getVPAIDAd());
           }
-          vpaidIFrame.contentWindow.HTMLElement.prototype.canPlayType = function() {
-            return true;
-          };
+        };
 
-          callback(vpaidIFrame.contentWindow.getVPAIDAd());
-        }
+        head.appendChild(script);
       };
 
-      head.appendChild(script);
+      document.body.appendChild(vpaidIFrame);
     };
 
     player.vast.initVPAID = function (vpaidTech, cb) {
