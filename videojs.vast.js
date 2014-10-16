@@ -504,10 +504,10 @@
           player.vastTracker.close();
         });
         player.vast.onVPAID('AdPaused', function() {
-          player.vastTracker.pause(true);
+          player.vastTracker.setPaused(true);
         });
         player.vast.onVPAID('AdPlaying', function() {
-          player.vastTracker.pause(false);
+          player.vastTracker.setPaused(false);
         });
         //TODO add creativeData
         vpaid.initAd(player.width(), player.height(), settings.viewMode, settings.bitrate, {}, pref);
