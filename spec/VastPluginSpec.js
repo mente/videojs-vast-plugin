@@ -551,6 +551,7 @@
       expect(player.vast.loadVPAIDResource).toHaveBeenCalled();
       expect(mockAd.handshakeVersion).toHaveBeenCalled();
       expect(mockAd.initAd).toHaveBeenCalled();
+      expect(player.vastTracker).toBeDefined();
     });
   });
 })(window, videojs, DMVAST);
