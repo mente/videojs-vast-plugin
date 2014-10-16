@@ -24,9 +24,7 @@
         // used in the tests
         video.load = function() {};
         video.play = function() {};
-        video.canPlayType = function() {
-          return "probably";
-        };
+
         video.buffered = 0;
 
         // see https://github.com/videojs/videojs-contrib-ads/blob/master/test/videojs.ads.test.js#L23
@@ -533,6 +531,9 @@
     });
 
     it("should load VAST, parse vpaid and call adsready", function(done) {
+      HTMLElement.prototype.canPlayType = function() {
+        return "probably";
+      };
       var mockAd = new MockVPAIDAd();
       var adsReadyCallback = jasmine.createSpy('adsReadyCallback').and.callFake(function() {
         done();
