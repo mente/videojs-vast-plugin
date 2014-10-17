@@ -15,7 +15,7 @@
   },
 
   defaults = {
-    skip: 5, // negative disables
+    skip: 5, // negative disables. Ignored for VPAID as VPAID asset controls it itself
     bitrate: 1000, //advised bitrate for VPAID ads
     viewMode: 'normal', //view mode for VPAID ads. Possible values: normal, thumbnail, fullscreen
     vpaidElement: undefined //html element used for vpaid ads
@@ -24,7 +24,7 @@
   vastPlugin = function(options) {
     var player = this;
     var settings = extend({}, defaults, options || {});
-    var vpaidObj, vpaidListeners = {}, vpaidIFrame = null, vpaidPlayer = null;
+    var vpaidObj, vpaidListeners = {}, vpaidIFrame = null, vpaidPlayer = null, vpaidTrackInterval = -1, vpaidSeeker;
 
     if (player.ads === undefined) {
         console.log("VAST requires videojs-contrib-ads");
@@ -69,6 +69,7 @@
                   if (vpaidTech) {
                     foundVPAID = true;
                     player.vast.initVPAID(vpaidTech, function() {
+                      player.vast.createVPAIDControls();
                       player.trigger('adsready');
                     });
                   } else {
@@ -162,10 +163,12 @@
 
       skipButton.onclick = function (e) {
         if ((' ' + player.vast.skipButton.className + ' ').indexOf(' enabled ') >= 0) {
-          player.vastTracker.skip();
-          player.vast.tearDown();
-          if (player.vast.vpaid) {
-            player.vast.vpaid.skipAd();
+          if (vpaidObj) {
+            vpaidObj.skipAd();
+            //will tear down after event AdSkipped is triggered
+          } else {
+            player.vastTracker.skip();
+            player.vast.tearDown();
           }
         }
         if (Event.prototype.stopPropagation !== undefined) {
@@ -241,13 +244,16 @@
         player.vast.tearDown();
       });
       vpaidObj.startAd();
+      vpaidTrackInterval = setInterval(player.vast.updateSeeker, 500);
       //player might be playing if video tags are different
       player.pause();
     };
 
     player.vast.tearDown = function() {
-      if (!vpaidObj) {
+      if (player.vast.skipButton) {
         player.vast.skipButton.parentNode.removeChild(player.vast.skipButton);
+      }
+      if (player.vast.blocker) {
         player.vast.blocker.parentNode.removeChild(player.vast.blocker);
       }
       player.off('timeupdate', player.vast.timeupdate);
@@ -276,6 +282,17 @@
         if (vpaidPlayer) {
           vpaidPlayer.parentNode.removeChild(vpaidPlayer);
         }
+        if (vpaidTrackInterval) {
+          clearInterval(vpaidTrackInterval);
+        }
+        player.vast.removeVPAIDControls();
+      }
+    };
+
+    player.vast.enableSkipButton = function () {
+      if ((' ' + player.vast.skipButton.className + ' ').indexOf(' enabled ') === -1) {
+        player.vast.skipButton.className += " enabled";
+        player.vast.skipButton.innerHTML = "Skip";
       }
     };
 
@@ -285,10 +302,7 @@
       if(timeLeft > 0) {
         player.vast.skipButton.innerHTML = "Skip in " + timeLeft + "...";
       } else {
-        if((' ' + player.vast.skipButton.className + ' ').indexOf(' enabled ') === -1){
-          player.vast.skipButton.className += " enabled";
-          player.vast.skipButton.innerHTML = "Skip";
-        }
+        player.vast.enableSkipButton();
       }
     };
     player.vast.createSourceObjects = function (media_files) {
@@ -399,26 +413,20 @@
           throw new Error("Versions different to 2.0 are not supported");
         }
 
-        var root = player.el(),
-          videoSlot;
-        if (/iphone|ipad|android/gi.test(navigator.userAgent)) { //in case if autoplay is disabled
-          console.log('using built-in video');
-          videoSlot = player.el().querySelector('.vjs-tech');
-        } else {
-          console.log('using second video tag');
-          vpaidPlayer = videoSlot = document.createElement('video');
-          if (!vpaidPlayer.canPlayType) {
-            console.log('Video element is not supported, can not play vpaid ad');
-          }
-
-          vpaidPlayer.className = 'vast-blocker';
-          root.insertBefore(vpaidPlayer, root.querySelector('.vjs-tech'));
-        }
+        var root = player.el();
         var pref = {
-          videoSlot: videoSlot,
           videoSlotCanAutoPlay: true,
           slot: root
         };
+        if (/iphone|ipad|android/gi.test(navigator.userAgent)) { //in case if autoplay is disabled
+          pref.videoSlot = player.el().querySelector('.vjs-tech');
+        } else {
+          vpaidPlayer = document.createElement('video');
+
+          vpaidPlayer.className = 'vast-blocker';
+          root.insertBefore(vpaidPlayer, root.querySelector('.vjs-tech'));
+          pref.videoSlot = vpaidPlayer;
+        }
 
         player.vast.onVPAID('AdError', function() {
           console.log('AdError', JSON.stringify(arguments));
@@ -452,6 +460,9 @@
         });
 
         player.vast.onVPAID('AdDurationChange', function() {
+          setTrackerDuration();
+        });
+        player.vast.onVPAID('AdRemainingTimeChange', function() {
           setTrackerDuration();
         });
         player.vast.onVPAID('AdSkipped', function() {
@@ -509,9 +520,57 @@
         player.vast.onVPAID('AdPlaying', function() {
           player.vastTracker.setPaused(false);
         });
+        player.vast.onVPAID('AdSkippableStateChange', function() {
+          if (vpaidObj.getAdSkippableState()) {
+            player.vast.createSkipButton();
+            player.vast.enableSkipButton();
+          } else if (player.vast.skipButton) {
+            player.vast.skipButton.parentNode.removeChild(player.vast.skipButton);
+          }
+        });
         //TODO add creativeData
         vpaid.initAd(player.width(), player.height(), settings.viewMode, settings.bitrate, {}, pref);
       });
+    };
+
+    player.vast.createVPAIDControls = function() {
+      vpaidSeeker = document.createElement('div');
+      vpaidSeeker.className = 'vast-ad-control';
+      var adText = 'Advertisement';
+      if (player.localize) {
+        adText = player.localize('Advertisement');
+      }
+      vpaidSeeker.innerHTML = '<span class="vast-advertisement">' + adText + ' <span class="vast-ad-left"></span></span><div class="vast-progress-holder"><div class="vjs-play-progress"></div></div>';
+      player.el().appendChild(vpaidSeeker, player.el().childNodes[0]);
+    };
+
+    player.vast.removeVPAIDControls = function() {
+      if (vpaidSeeker) {
+        vpaidSeeker.parentNode.removeChild(vpaidSeeker);
+      }
+    };
+
+    player.vast.updateSeeker = function() {
+      var remaining = vpaidObj.getAdRemainingTime();
+      if (remaining < 0) {
+        return;
+      }
+      var total = vpaidObj.getAdDuration();
+      if (total < 0) {
+        return;
+      }
+      var progress = vpaidSeeker.querySelector('.vjs-play-progress');
+      progress.style.width = ((total - remaining) / total * 100) + '%';
+
+      //taken from videojs-iva
+      var remainingMinutes = Math.floor(remaining / 60);
+      var remainingSeconds = Math.floor(remaining % 60);
+      if (remainingSeconds.toString().length < 2) {
+        remainingSeconds = '0' + remainingSeconds;
+      }
+      var remains = remainingMinutes + ':' + remainingSeconds;
+      progress.innerHTML = '<span class="vjs-control-text">' + remains + '</span>';
+      vpaidSeeker.querySelector('.vast-ad-left').innerHTML = remains;
     };
 
     player.vast.onVPAID = function(event, func) {
