@@ -1,4 +1,4 @@
-(function(vjs, vast) {
+(function(vjs, vast, undefined) {
 "use strict";
   var
   extend = function(obj) {
