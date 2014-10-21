@@ -37,6 +37,15 @@
       return;
     }
 
+    //preserve support for older video.js versions
+    function localize(text) {
+      if (player.localize) {
+        return player.localize(text);
+      } else {
+        return text;
+      }
+    }
+
     // videojs-ads triggers this when src changes
     player.on('contentupdate', function(){
       player.vast.getContent(settings.url);
@@ -295,7 +304,7 @@
     player.vast.enableSkipButton = function () {
       if ((' ' + player.vast.skipButton.className + ' ').indexOf(' enabled ') === -1) {
         player.vast.skipButton.className += " enabled";
-        player.vast.skipButton.innerHTML = "Skip";
+        player.vast.skipButton.innerHTML = localize("Skip");
       }
     };
 
@@ -303,7 +312,8 @@
       player.loadingSpinner.el().style.display = "none";
       var timeLeft = Math.ceil(settings.skip - player.currentTime());
       if(timeLeft > 0) {
-        player.vast.skipButton.innerHTML = "Skip in " + timeLeft + "...";
+        var translation = localize('Skip in %num%...');
+        player.vast.skipButton.innerHTML = translation.replace('%num%', timeLeft);
       } else {
         player.vast.enableSkipButton();
       }
@@ -539,11 +549,7 @@
     player.vast.createVPAIDControls = function() {
       vpaidSeeker = document.createElement('div');
       vpaidSeeker.className = 'vast-ad-control';
-      var adText = 'Advertisement';
-      if (player.localize) {
-        adText = player.localize('Advertisement');
-      }
-      vpaidSeeker.innerHTML = '<span class="vast-advertisement">' + adText + ' <span class="vast-ad-left"></span></span><div class="vast-progress-holder"><div class="vjs-play-progress"></div></div>';
+      vpaidSeeker.innerHTML = '<span class="vast-advertisement">' + localize('Advertisement') + ' <span class="vast-ad-left"></span></span><div class="vast-progress-holder"><div class="vjs-play-progress"></div></div>';
       player.el().appendChild(vpaidSeeker, player.el().childNodes[0]);
     };
 
