@@ -194,8 +194,8 @@
     
     describe("tearDown", function() {
 
-      it("should end the linear ad", function() {
-        spyOn(player.ads, "endLinearAdMode");
+      it("should end the linear ad", function(done) {
+        spyOn(player.ads, "endLinearAdMode").and.callFake(done);
         spyOn(player, "off");
 
         // TODO: fix this
@@ -206,7 +206,6 @@
 
         player.vast.tearDown();
         expect(player.off).toHaveBeenCalledWith("ended", jasmine.any(Function));
-        expect(player.ads.endLinearAdMode).toHaveBeenCalled();
       });
     });
 
@@ -424,7 +423,7 @@
       "bitrate": 0,
       "codec": null,
       "deliveryType": "progressive",
-      "fileURL": "http://cdn-static.liverail.com/js/LiveRail.AdManager-1.0.js?LR_PUBLISHER_ID=56889&LR_FORMAT=application/javascript&LR_AUTOPLAY=0&LR_CONTENT=1&LR_TITLE=Misunderstood+%C2%A3400%2C000+Banksy+destroyed+by+council&LR_VIDEO_ID=589129&LR_VERTICALS=international_news&LR_DEBUG=4",
+      "fileURL": "http://cdn-static.liverail.com/js/LiveRail.AdManager-1.0.js?LR_PUBLISHER_ID=1331&LR_FORMAT=application/javascript&LR_AUTOPLAY=0&LR_DEBUG=4",
       "height": 480,
       "maxBitrate": 0,
       "mimeType": "application/javascript",

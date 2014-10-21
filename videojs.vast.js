@@ -238,9 +238,6 @@
         player.controls(false);
       }
       player.vast.oneVPAID('AdStopped', function() {
-        if (vpaidPlayer) {
-          player.el().querySelector('.vjs-tech').style.display = '';
-        }
         player.vast.tearDown();
       });
       vpaidObj.startAd();
@@ -258,7 +255,6 @@
       }
       player.off('timeupdate', player.vast.timeupdate);
       player.off('ended', player.vast.tearDown);
-      player.ads.endLinearAdMode();
       if (player.vast.showControls ) {
         player.controls(true);
       }
@@ -279,14 +275,21 @@
         vpaidObj = null;
         vpaidIFrame = null;
         vpaidListeners = {};
-        if (vpaidPlayer) {
-          vpaidPlayer.parentNode.removeChild(vpaidPlayer);
-        }
-        if (vpaidTrackInterval) {
-          clearInterval(vpaidTrackInterval);
-        }
         player.vast.removeVPAIDControls();
       }
+      if (vpaidTrackInterval != -1) {
+        clearInterval(vpaidTrackInterval);
+        vpaidTrackInterval = -1;
+      }
+      if (vpaidPlayer) {
+        vpaidPlayer.parentNode.removeChild(vpaidPlayer);
+        player.el().querySelector('.vjs-tech').style.display = '';
+      }
+
+      //complete in async manner. Sometimes when shutdown too soon, video does not start playback
+      setTimeout(function() {
+        player.ads.endLinearAdMode();
+      }, 0);
     };
 
     player.vast.enableSkipButton = function () {
@@ -429,7 +432,6 @@
         }
 
         player.vast.onVPAID('AdError', function() {
-          console.log('AdError', JSON.stringify(arguments));
           player.vast.tearDown();
         });
         player.on('resize', function() {
@@ -470,6 +472,7 @@
           player.vast.tearDown();
         });
         player.vast.onVPAID('AdStarted', function() {
+          player.ads.startLinearAdMode();
           player.vastTracker.load();
         });
         player.vast.onVPAID('AdVolumeChange', function() {
@@ -551,6 +554,12 @@
     };
 
     player.vast.updateSeeker = function() {
+      if (!vpaidObj) {
+        //might be it was shutdown earlier than first seek could appear. Silently remove itself
+        clearInterval(vpaidTrackInterval);
+        vpaidTrackInterval = -1;
+        return;
+      }
       var remaining = vpaidObj.getAdRemainingTime();
       if (remaining < 0) {
         return;
