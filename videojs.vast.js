@@ -215,9 +215,11 @@
     player.vast.tearDown = function() {
       if (player.vast.skipButton) {
         player.vast.skipButton.parentNode.removeChild(player.vast.skipButton);
+        player.vast.skipButton = undefined;
       }
       if (player.vast.blocker) {
         player.vast.blocker.parentNode.removeChild(player.vast.blocker);
+        player.vast.blocker = undefined;
       }
       player.off('timeupdate', player.vast.timeupdate);
       player.off('ended', player.vast.tearDown);
@@ -564,8 +566,7 @@
     };
 
     player.vast.updateSeeker = function() {
-      if (!vpaidObj) {
-        //might be it was shutdown earlier than first seek could appear. Silently remove itself
+      if (!vpaidObj && vpaidTrackInterval != -1) { //might be it was shutdown earlier than first seek could appear. Silently remove itself
         clearInterval(vpaidTrackInterval);
         vpaidTrackInterval = -1;
         return;
@@ -627,8 +628,8 @@
 
     player.vast.oneVPAID = function(event, func) {
       var wrapper = function() {
-        func();
         player.vast.offVPAID(event, wrapper);
+        func();
       };
       player.vast.onVPAID(event, wrapper);
     };
