@@ -530,9 +530,6 @@
     });
 
     it("should load VAST, parse vpaid and call adsready", function(done) {
-      HTMLElement.prototype.canPlayType = function() {
-        return "probably";
-      };
       var mockAd = new MockVPAIDAd();
       var adsReadyCallback = jasmine.createSpy('adsReadyCallback').and.callFake(function() {
         done();
