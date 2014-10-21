@@ -201,17 +201,11 @@
     };
 
     player.vast.prerollVPAID = function() {
-      if (vpaidPlayer) { //hide original player if separate video slot is used
-        player.el().querySelector('.vjs-tech').style.display = 'none';
-      }
       player.ads.startLinearAdMode();
       player.vast.showControls = player.controls();
       if (player.vast.showControls ) {
         player.controls(false);
       }
-      player.vast.oneVPAID('AdStopped', function() {
-        player.vast.tearDown();
-      });
       vpaidObj.startAd();
       vpaidTrackInterval = setInterval(player.vast.updateSeeker, 500);
       //player might be playing if video tags are different
@@ -436,7 +430,7 @@
           videoSlotCanAutoPlay: true,
           slot: root
         };
-        if (/iphone|ipad|android/gi.test(navigator.userAgent)) { //in case if autoplay is disabled
+        if (/iphone|ipad|android/gi.test(navigator.userAgent)) {
           pref.videoSlot = player.el().querySelector('.vjs-tech');
         } else {
           vpaidPlayer = document.createElement('video');
@@ -444,11 +438,9 @@
           vpaidPlayer.className = 'vast-blocker';
           root.insertBefore(vpaidPlayer, root.querySelector('.vjs-tech'));
           pref.videoSlot = vpaidPlayer;
+          player.el().querySelector('.vjs-tech').style.display = "none";
         }
 
-        player.vast.onVPAID('AdError', function() {
-          player.vast.tearDown();
-        });
         player.on('resize', function() {
           vpaid.resizeAd(player.width(), player.height(), settings.viewMode);
         });
@@ -468,12 +460,19 @@
             }
           }
         }
+
+        player.vast.onVPAID('AdError', function() {
+          player.vast.tearDown();
+        });
         player.vast.oneVPAID('AdLoaded', function() {
           if (cb) {
             cb(vpaid);
           }
 
           setTrackerDuration();
+        });
+        player.vast.oneVPAID('AdStopped', function() {
+          player.vast.tearDown();
         });
 
         player.vast.onVPAID('AdDurationChange', function() {
@@ -482,11 +481,11 @@
         player.vast.onVPAID('AdRemainingTimeChange', function() {
           setTrackerDuration();
         });
-        player.vast.onVPAID('AdSkipped', function() {
+        player.vast.oneVPAID('AdSkipped', function() {
           player.vastTracker.skip();
           player.vast.tearDown();
         });
-        player.vast.onVPAID('AdStarted', function() {
+        player.vast.oneVPAID('AdStarted', function() {
           player.ads.startLinearAdMode();
           player.vastTracker.load();
         });
