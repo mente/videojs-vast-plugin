@@ -82,58 +82,21 @@
                       player.trigger('adsready');
                     });
                   } else {
+
                     player.vast.sources = player.vast.createSourceObjects(creative.mediaFiles);
                     if (!player.vast.sources.length) {
                       player.trigger('adtimeout');
                       return;
                     }
 
-                    var errorOccurred = false,
-                      canplayFn = function() {
-                        this.vastTracker.load();
-                      },
-                      timeupdateFn = function() {
-                        if (isNaN(this.vastTracker.assetDuration)) {
-                          this.vastTracker.assetDuration = this.duration();
-                        }
-                        this.vastTracker.setProgress(this.currentTime());
-                      },
-                      playFn = function() {
-                        this.vastTracker.setPaused(false);
-                      },
-                      pauseFn = function() {
-                        this.vastTracker.setPaused(true);
-                      },
-                      errorFn = function() {
-                        // Inform ad server we couldn't play the media file for this ad
-                        vast.util.track(ad.errorURLTemplates, {ERRORCODE: 405});
-                        errorOccurred = true;
-                        player.trigger('ended');
-                      };
-
-                    player.on('canplay', canplayFn);
-                    player.on('timeupdate', timeupdateFn);
-                    player.on('play', playFn);
-                    player.on('pause', pauseFn);
-                    player.on('error', errorFn);
-
-                    player.one('ended', function() {
-                      player.off('canplay', canplayFn);
-                      player.off('timeupdate', timeupdateFn);
-                      player.off('play', playFn);
-                      player.off('pause', pauseFn);
-                      player.off('error', errorFn);
-                      if (!errorOccurred) {
-                        this.vastTracker.complete();
-                      }
-                    });
+                    player.vast.initSimpleVAST(ad);
                   }
 
                   foundCreative = true;
                 }
 
               } else if (creative.type === "companion" && !foundCompanion) {
-
+                //TODO is it ever used?
                 player.vast.companion = creative;
 
                 foundCompanion = true;
@@ -417,6 +380,48 @@
       };
 
       document.body.appendChild(vpaidIFrame);
+    };
+
+    player.vast.initSimpleVAST = function(ad) {
+      var errorOccurred = false,
+        canplayFn = function() {
+          this.vastTracker.load();
+        },
+        timeupdateFn = function() {
+          if (isNaN(this.vastTracker.assetDuration)) {
+            this.vastTracker.assetDuration = this.duration();
+          }
+          this.vastTracker.setProgress(this.currentTime());
+        },
+        playFn = function() {
+          this.vastTracker.setPaused(false);
+        },
+        pauseFn = function() {
+          this.vastTracker.setPaused(true);
+        },
+        errorFn = function() {
+          // Inform ad server we couldn't play the media file for this ad
+          vast.util.track(ad.errorURLTemplates, {ERRORCODE: 405});
+          errorOccurred = true;
+          player.trigger('ended');
+        };
+
+      player.on('canplay', canplayFn);
+      player.on('timeupdate', timeupdateFn);
+      player.on('play', playFn);
+      player.on('pause', pauseFn);
+      player.on('error', errorFn);
+
+      player.one('ended', function() {
+        player.off('canplay', canplayFn);
+        player.off('timeupdate', timeupdateFn);
+        player.off('play', playFn);
+        player.off('pause', pauseFn);
+        player.off('error', errorFn);
+        if (!errorOccurred) {
+          this.vastTracker.complete();
+        }
+      });
     };
 
     player.vast.initVPAID = function(vpaidTech, cb) {
