@@ -431,46 +431,6 @@
       "width": 640
     };
 
-    function MockVPAIDAd() {
-      var self = this;
-
-      this.listeners = {};
-      this.handshakeVersion = function(version) {
-        return version;
-      };
-
-      this.initAd = function() {
-        this.trigger('AdLoaded');
-      };
-
-      this.subscribe = function(func, event) {
-        if (self.listeners[event] === undefined) {
-          self.listeners[event] = [];
-        }
-        self.listeners[event].push(func);
-      };
-
-      this.unsubscribe = function(func, event) {
-        if (self.listeners[event] === undefined) {
-          return;
-        }
-
-        var index = self.listeners[event].indexOf(func);
-        if (index >= 0) {
-          self.listeners[event].splice(index, 1);
-        }
-      };
-
-      this.trigger = function(event) {
-        if (self.listeners[event]) {
-          for (var i = 0; i < self.listeners[event].length; i++) {
-            self.listeners[event][i]();
-          }
-        }
-      };
-
-      return this;
-    }
     beforeEach(function() {
       spyOn(vast.client, "get").and.callFake(function(url, callback){
         var response = {
@@ -527,28 +487,157 @@
         };
         callback(response);
       });
+
+      function MockVPAIDAd() {
+        var self = this;
+
+        this.listeners = {};
+        this.totalListeners = function() {
+          var total = 0;
+          for (var event in self.listeners) {
+            if (!self.listeners.hasOwnProperty(event)) {
+              continue;
+            }
+
+            total += self.listeners[event].length;
+          }
+
+          return total;
+        };
+
+        this.handshakeVersion = function(version) {
+          return version;
+        };
+
+        this.initAd = function() {
+          this.trigger('AdLoaded');
+        };
+
+        this.subscribe = function(func, event) {
+          if (self.listeners[event] === undefined) {
+            self.listeners[event] = [];
+          }
+          self.listeners[event].push(func);
+        };
+
+        this.unsubscribe = function(func, event) {
+          if (self.listeners[event] === undefined) {
+            return;
+          }
+
+          var index = self.listeners[event].indexOf(func);
+          if (index >= 0) {
+            self.listeners[event].splice(index, 1);
+          }
+        };
+
+        this.trigger = function(event) {
+          if (self.listeners[event]) {
+            for (var i = 0; i < self.listeners[event].length; i++) {
+              self.listeners[event][i]();
+            }
+          }
+        };
+
+        return this;
+      }
+
+      var ad = new MockVPAIDAd();
+      this.mockAd = ad;
+      spyOn(player.vast, 'loadVPAIDResource').and.callFake(function(mediaFile, callback) {
+        callback(ad);
+      });
     });
 
     it("should load VAST, parse vpaid and call adsready", function(done) {
-      var mockAd = new MockVPAIDAd();
-      var adsReadyCallback = jasmine.createSpy('adsReadyCallback').and.callFake(function() {
-        done();
-      });
+      var adsReadyCallback = jasmine.createSpy('adsReadyCallback').and.callFake(done);
+      spyOn(this.mockAd, 'handshakeVersion').and.callThrough();
+      spyOn(this.mockAd, 'initAd').and.callThrough();
 
-      spyOn(mockAd, 'handshakeVersion').and.callThrough();
-      spyOn(mockAd, 'initAd').and.callThrough();
-      spyOn(player.vast, 'loadVPAIDResource').and.callFake(function(mediaFile, callback) {
-        callback(mockAd);
-      });
       player.one('adsready', adsReadyCallback);
 
-      player.vast.getContent("fake url", function() {});
+
+      player.vast.getContent("fake url");
 
 
       expect(player.vast.loadVPAIDResource).toHaveBeenCalled();
-      expect(mockAd.handshakeVersion).toHaveBeenCalled();
-      expect(mockAd.initAd).toHaveBeenCalled();
+      expect(this.mockAd.handshakeVersion).toHaveBeenCalled();
+      expect(this.mockAd.initAd).toHaveBeenCalled();
       expect(player.vastTracker).toBeDefined();
+    });
+
+    describe('events', function() {
+      ['AdStopped', 'AdError'].forEach(function(event) {
+        it('should call tearDown as soon as ' + event + ' event is triggered', function() {
+          spyOn(player.vast, 'tearDown');
+
+          player.vast.getContent("fake url");
+          this.mockAd.trigger(event);
+
+          expect(player.vast.tearDown).toHaveBeenCalled();
+        });
+      });
+
+      it('should call tearDown and track event to VAST when AdSkipped event is triggered', function() {
+        spyOn(player.vast, 'tearDown');
+
+        player.vast.getContent("fake url");
+        spyOn(player.vastTracker, 'skip');
+        this.mockAd.trigger('AdSkipped');
+
+        expect(player.vast.tearDown).toHaveBeenCalled();
+        expect(player.vastTracker.skip).toHaveBeenCalled();
+      });
+    });
+
+    describe('tearDown', function() {
+      it('should correctly remove vpaid video element and show original after tearDown', function() {
+        spyOn(player.vast, 'tearDown').and.callThrough();
+
+        player.vast.getContent("fake url");
+        expect(document.querySelectorAll('video').length).toEqual(2);
+        expect(document.querySelector('.vjs-tech').style.display).toEqual('none');
+        this.mockAd.trigger('AdStopped');
+
+        expect(player.vast.tearDown).toHaveBeenCalled();
+        expect(document.querySelectorAll('video').length).toEqual(1);
+        expect(document.querySelector('.vjs-tech').style.display).toEqual('');
+      });
+
+      it('should remove all listeners from vpaid after tear down', function() {
+        var callback = jasmine.createSpy('AdStoppedCallback');
+
+        player.vast.getContent("fake url");
+        player.vast.onVPAID('AdStopped', callback);
+        player.vast.tearDown();
+
+        expect(callback).not.toHaveBeenCalled();
+        expect(this.mockAd.totalListeners()).toEqual(0);
+      });
+
+      it('should remove vpaid ad controls after tear down', function() {
+        player.vast.getContent("fake url");
+
+        expect(document.querySelector('.vast-ad-control')).not.toBeNull();
+        player.vast.tearDown();
+        expect(document.querySelector('.vast-ad-control')).toBeNull();
+      });
+    });
+  });
+
+  describe('Localization', function() {
+    it('should use video.js localization if vjs.localize is available', function() {
+      spyOn(player, 'localize');
+      player.vast.createSkipButton();
+      player.vast.enableSkipButton();
+
+      expect(player.localize).toHaveBeenCalled();
+    });
+
+    it('should fallback to default text if vjs.localize is not available (prior to video.js 4.7.3)', function() {
+      player.localize = undefined;
+      player.vast.createSkipButton();
+      player.vast.enableSkipButton();
     });
   });
 })(window, videojs, DMVAST);
