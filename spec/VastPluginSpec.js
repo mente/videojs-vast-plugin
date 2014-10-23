@@ -321,7 +321,8 @@
               callback(fake_response);
             });
         });
-          it("should do nothing with non-linear ads, and report the error", function() {
+
+        it("should do nothing with non-linear ads, and report the error", function() {
           spyOn(vast.util, "track");
           spyOn(player, "trigger");
           player.vast.getContent("some url");
