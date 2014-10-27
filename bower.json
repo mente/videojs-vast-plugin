@@ -29,6 +29,7 @@
   "dependencies": {
     "videojs": "4.9.1",
     "vast-client-js": "1.3.0",
-    "videojs-contrib-ads": "0.4.0"
+    "videojs-contrib-ads": "0.4.0",
+    "videojs-youtube": "1.2.6"
   }
 }

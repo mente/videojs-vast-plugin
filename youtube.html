@@ -1,0 +1,45 @@
+<!doctype html>
+<head>
+    <title>Video.JS Example</title>
+    <link href="bower_components/videojs/dist/video-js/video-js.css" rel="stylesheet">
+    <link href="bower_components/videojs-contrib-ads/src/videojs.ads.css" rel="stylesheet">
+    <link href="videojs.vast.css" rel="stylesheet">
+    <script src="bower_components/videojs/dist/video-js/video.js"></script>
+
+    <script src="bower_components/vast-client-js/vast-client.js"></script>
+    <script src="bower_components/videojs-contrib-ads/src/videojs.ads.js"></script>
+    <script src="videojs.vast.js"></script>
+    <script src="bower_components/videojs-youtube/src/youtube.js"></script>
+</head>
+<body>
+<video id="vid1"
+       class="video-js vjs-default-skin"
+       width="640" height="360"
+       controls
+       data-setup='{}'>
+</video>
+<script>
+
+    var vid1 = videojs('vid1', {"techOrder": ["youtube"]});
+    try {
+
+        vid1.src(
+            {
+                src: "http://www.youtube.com/watch?v=xjS6SftYQaQ",
+                type: "video/youtube"
+            }
+        );
+
+        vid1.ads({debug: true});
+
+        vid1.vast({
+            url: "http://ad4.liverail.com/?LR_PUBLISHER_ID=1331&LR_SCHEMA=vast2-vpaid&LR_AUTOPLAY=0&LR_CONTENT=1&LR_TITLE=Misunderstood+£400%2C000+Banksy+destroyed+by+council&LR_VIDEO_ID=589129&LR_VERTICALS=international_news&LR_FORMAT=application/javascript",
+            skip: 4 // Does not work, I don't see a skip button
+        });
+//        vid1.controls(true);
+        vid1.play();
+    } catch(e) {
+        alert("error:" + e);
+    }
+</script>
+</body>
