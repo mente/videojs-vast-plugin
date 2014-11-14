@@ -17,8 +17,7 @@
   defaults = {
     skip: 5, // negative disables. Ignored for VPAID as VPAID asset controls it itself
     bitrate: 1000, //advised bitrate for VPAID ads
-    viewMode: 'normal', //view mode for VPAID ads. Possible values: normal, thumbnail, fullscreen
-    vpaidElement: undefined //html element used for vpaid ads
+    viewMode: 'normal' //view mode for VPAID ads. Possible values: normal, thumbnail, fullscreen
   },
 
   vastPlugin = function(options) {
